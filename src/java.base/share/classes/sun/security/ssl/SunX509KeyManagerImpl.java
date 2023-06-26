@@ -34,6 +34,7 @@ import java.security.Principal;
 import java.security.PrivateKey;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateParsingException;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +48,8 @@ import java.util.Set;
 import javax.net.ssl.SSLEngine;
 import javax.net.ssl.X509ExtendedKeyManager;
 import javax.security.auth.x500.X500Principal;
+
+import sun.security.util.KnownOIDs;
 
 
 /**
@@ -307,7 +310,7 @@ final class SunX509KeyManagerImpl extends X509ExtendedKeyManager {
      */
     @Override
     public String[] getClientAliases(String keyType, Principal[] issuers) {
-        return getAliases(keyType, issuers);
+        return getAliases(keyType, issuers, KnownOIDs.clientAuth);
     }
 
     /*
@@ -317,7 +320,7 @@ final class SunX509KeyManagerImpl extends X509ExtendedKeyManager {
      */
     @Override
     public String[] getServerAliases(String keyType, Principal[] issuers) {
-        return getAliases(keyType, issuers);
+        return getAliases(keyType, issuers, KnownOIDs.serverAuth);
     }
 
     /*
@@ -327,7 +330,7 @@ final class SunX509KeyManagerImpl extends X509ExtendedKeyManager {
      *
      * Issuers come to us in the form of X500Principal[].
      */
-    private String[] getAliases(String keyType, Principal[] issuers) {
+    private String[] getAliases(String keyType, Principal[] issuers, KnownOIDs oid) {
         if (keyType == null) {
             return null;
         }
@@ -360,6 +363,19 @@ final class SunX509KeyManagerImpl extends X509ExtendedKeyManager {
 
             if (!keyType.equals(certs[0].getPublicKey().getAlgorithm())) {
                 continue;
+            }
+            try {
+                List<String> ekus = certs[0].getExtendedKeyUsage();
+                if (ekus != null && !ekus.isEmpty()) {
+                    if (!ekus.contains(oid.value())) {
+                        continue;
+                    }
+                }
+            } catch (CertificateParsingException cpe) {
+                if (SSLLogger.isOn && SSLLogger.isOn("keymanager")) {
+                    SSLLogger.warning("Failed while checking extended key usage: ", oid.name(), cpe);
+                }
+
             }
             if (sigType != null) {
                 if (certs.length > 1) {

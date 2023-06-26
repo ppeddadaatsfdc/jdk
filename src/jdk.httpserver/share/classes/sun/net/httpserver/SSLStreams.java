@@ -85,8 +85,14 @@ class SSLStreams {
                         );
                     } catch (IllegalArgumentException e) { /* LOG */}
                 }
-                engine.setNeedClientAuth (params.getNeedClientAuth());
-                engine.setWantClientAuth (params.getWantClientAuth());
+                //Need auth takes precedence over want client auth
+                if (params.getNeedClientAuth()) {
+                    engine.setNeedClientAuth(true);
+                } else if (params.getWantClientAuth()) {
+                    engine.setWantClientAuth(true);
+                } else {
+                    engine.setWantClientAuth(false);
+                }
                 if (params.getProtocols() != null) {
                     try {
                         engine.setEnabledProtocols (
